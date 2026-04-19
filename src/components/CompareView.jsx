@@ -13,6 +13,7 @@ import {
 import TimelineChart from './charts/TimelineChart';
 import RadarChart from './charts/RadarChart';
 import MetricBar from './charts/MetricBar';
+import MapCompare from './charts/MapCompare';
 
 const COLUMNS = [
   { key: 'date', label: 'Date', format: (v) => v, sort: (a, b) => a.date.localeCompare(b.date) },
@@ -36,7 +37,7 @@ const COLORS = ['#00c87a', '#60a5fa', '#f59e0b', '#e879f9', '#fb923c', '#34d399'
 export default function CompareView({ segment, efforts, onClearEfforts }) {
   const [sortKey, setSortKey] = useState('date');
   const [sortDir, setSortDir] = useState(1);
-  const [view, setView] = useState('table'); // 'table' | 'timeline' | 'radar'
+  const [view, setView] = useState('table'); // 'table' | 'timeline' | 'radar' | 'map'
 
   if (!segment) {
     return (
@@ -96,7 +97,7 @@ export default function CompareView({ segment, efforts, onClearEfforts }) {
               Clear efforts
             </button>
           )}
-          {['table', 'timeline', 'radar'].map((v) => (
+          {['table', 'timeline', 'radar', 'map'].map((v) => (
             <button
               key={v}
               onClick={() => setView(v)}
@@ -112,7 +113,7 @@ export default function CompareView({ segment, efforts, onClearEfforts }) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-3">
+      <div className={`flex-1 min-h-0 ${view === 'map' ? 'overflow-hidden' : 'overflow-auto p-3'}`}>
         {view === 'table' && (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
@@ -169,6 +170,8 @@ export default function CompareView({ segment, efforts, onClearEfforts }) {
         )}
 
         {view === 'radar' && <RadarChart efforts={efforts} />}
+
+        {view === 'map' && <MapCompare efforts={efforts} />}
       </div>
     </div>
   );

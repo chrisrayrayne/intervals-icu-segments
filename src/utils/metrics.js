@@ -122,7 +122,7 @@ export function extractEffortMetrics(streams, startIndex, endIndex) {
 
   // Per-point stream slices for segment chart overlay
   const streamSlices = {};
-  const SLICE_KEYS = ['time', 'watts', 'heartrate', 'velocity_smooth', 'cadence', 'altitude', 'grade_smooth', 'distance'];
+  const SLICE_KEYS = ['time', 'latlng', 'watts', 'heartrate', 'velocity_smooth', 'cadence', 'altitude', 'grade_smooth', 'distance'];
   for (const key of SLICE_KEYS) {
     if (streams[key]) streamSlices[key] = streams[key].slice(startIndex, endIndex + 1);
   }
