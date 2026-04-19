@@ -3,6 +3,7 @@ import Auth from './components/Auth';
 import SegmentList from './components/SegmentList';
 import ActivityList from './components/ActivityList';
 import MapPicker from './components/MapPicker';
+import ActivityMap from './components/ActivityMap';
 import CompareView from './components/CompareView';
 import { useSegments } from './hooks/useSegments';
 import { useIntervals } from './hooks/useIntervals';
@@ -14,7 +15,7 @@ export default function App() {
   const [selectedSegmentId, setSelectedSegmentId] = useState(null);
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [definingSegment, setDefiningSegment] = useState(false);
-  const [rightPanel, setRightPanel] = useState('activities'); // 'activities' | 'compare' | 'map'
+  const [rightPanel, setRightPanel] = useState('activities'); // 'activities' | 'activityMap' | 'compare' | 'map'
 
   const {
     segments,
@@ -64,6 +65,7 @@ export default function App() {
   function handleSelectActivity(activity) {
     setSelectedActivity(activity);
     if (definingSegment) setRightPanel('map');
+    else setRightPanel('activityMap');
   }
 
   async function handleSegmentCreated(segmentData) {
@@ -163,13 +165,19 @@ export default function App() {
 
         {/* Right: map picker or compare view */}
         <div className="flex-1 overflow-hidden flex flex-col">
+          {rightPanel === 'activityMap' && (
+            <ActivityMap activity={selectedActivity} />
+          )}
+
           {rightPanel === 'map' && selectedActivity && (
             <MapPicker
               activity={selectedActivity}
               onSegmentCreated={handleSegmentCreated}
               onCancel={() => {
                 setDefiningSegment(false);
-                setRightPanel(selectedSegmentId ? 'compare' : 'activities');
+                if (selectedSegmentId) setRightPanel('compare');
+                else if (selectedActivity) setRightPanel('activityMap');
+                else setRightPanel('activities');
               }}
             />
           )}
