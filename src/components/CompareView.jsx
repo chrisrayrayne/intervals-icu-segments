@@ -37,7 +37,6 @@ export default function CompareView({ segment, efforts }) {
   const [sortKey, setSortKey] = useState('date');
   const [sortDir, setSortDir] = useState(1);
   const [view, setView] = useState('table'); // 'table' | 'timeline' | 'radar'
-  const [goalSeconds, setGoalSeconds] = useState('');
 
   if (!segment) {
     return (
@@ -158,19 +157,7 @@ export default function CompareView({ segment, efforts }) {
         )}
 
         {view === 'timeline' && (
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-2">
-              <label className="text-muted text-xs">Goal time (s):</label>
-              <input
-                type="number"
-                value={goalSeconds}
-                onChange={(e) => setGoalSeconds(e.target.value)}
-                placeholder="e.g. 2700"
-                className="w-28 bg-bg border border-border rounded px-2 py-1 text-text text-xs focus:outline-none focus:border-accent"
-              />
-            </div>
-            <TimelineChart efforts={efforts} goalSeconds={goalSeconds ? Number(goalSeconds) : null} />
-          </div>
+          <TimelineChart efforts={efforts} />
         )}
 
         {view === 'radar' && <RadarChart efforts={efforts} />}

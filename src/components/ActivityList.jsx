@@ -17,11 +17,16 @@ export default function ActivityList({ segments, onEffortsFound, onSelectActivit
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  // Pending = what's in the inputs; applied = what's active in the API query
+  const [pendingRouteFilter, setPendingRouteFilter] = useState('');
+  const [pendingTypeFilter, setPendingTypeFilter] = useState('');
+  const [pendingDateFrom, setPendingDateFrom] = useState('');
+  const [pendingDateTo, setPendingDateTo] = useState('');
   const [routeFilter, setRouteFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
-  const [nameSearch, setNameSearch] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [nameSearch, setNameSearch] = useState('');
   // How many 6-month windows we've loaded (1 = last 6 months, 2 = last 12 months, …)
   const [windows, setWindows] = useState(1);
   const [analysing, setAnalysing] = useState(false);
@@ -62,11 +67,18 @@ export default function ActivityList({ segments, onEffortsFound, onSelectActivit
     load(1, false);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Reload when filters change
+  // Reload when applied filters change
   useEffect(() => {
     setWindows(1);
     load(1, false);
   }, [routeFilter, typeFilter, dateFrom, dateTo]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function applyFilters() {
+    setRouteFilter(pendingRouteFilter);
+    setTypeFilter(pendingTypeFilter);
+    setDateFrom(pendingDateFrom);
+    setDateTo(pendingDateTo);
+  }
 
   function loadMore() {
     const next = windows + 1;

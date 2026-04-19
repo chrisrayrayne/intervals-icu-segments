@@ -63,12 +63,12 @@ export default function MapPicker({ activity, onSegmentCreated, onCancel }) {
         if (!streams || !streams.latlng?.length) {
           setError('No GPS data for this activity');
         } else {
-          const pairs = normaliseLatlng(streams.latlng);
-          console.log('[MapPicker] latlng pairs:', pairs.length, 'sample:', JSON.stringify(pairs[0]));
-          if (pairs.length === 0) {
+          const aligned = normaliseLatlng(streams.latlng);
+          const nonNull = aligned.filter(p => p != null);
+          if (nonNull.length === 0) {
             setError('No GPS data for this activity');
           } else {
-            setLatlngStream(pairs);
+            setLatlngStream(aligned); // full index-aligned array
           }
         }
       })
@@ -118,7 +118,7 @@ export default function MapPicker({ activity, onSegmentCreated, onCancel }) {
     );
   }
 
-  if (error || !latlngStream || latlngStream.length === 0) {
+  if (error || !latlngStream || !latlngStream.some(p => p != null)) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3">
         <p className="text-danger text-sm">{error || 'No GPS data'}</p>
@@ -127,8 +127,8 @@ export default function MapPicker({ activity, onSegmentCreated, onCancel }) {
     );
   }
 
-  const center = latlngStream[Math.floor(latlngStream.length / 2)];
-  const positions = latlngStream;
+  const positions = latlngStream.filter(p => p != null);
+  const center = positions[Math.floor(positions.length / 2)];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: 12, gap: 8 }}>

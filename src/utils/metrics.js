@@ -118,6 +118,13 @@ export function extractEffortMetrics(streams, startIndex, endIndex) {
     elevationGain = Math.round(gain);
   }
 
+  // Per-point stream slices for segment chart overlay
+  const streamSlices = {};
+  const SLICE_KEYS = ['watts', 'heartrate', 'velocity_smooth', 'cadence', 'altitude', 'grade_smooth', 'distance'];
+  for (const key of SLICE_KEYS) {
+    if (streams[key]) streamSlices[key] = streams[key].slice(startIndex, endIndex + 1);
+  }
+
   return {
     elapsedTime,
     distance: distance != null ? Math.round(distance) : null,
@@ -130,5 +137,6 @@ export function extractEffortMetrics(streams, startIndex, endIndex) {
     avgGrade: gradeArr ? Number((avg(gradeArr, startIndex, endIndex) ?? 0).toFixed(1)) : null,
     elevationGain,
     normalizedPower: normalizedPower(wattsArr, startIndex, endIndex),
+    streamSlices,
   };
 }

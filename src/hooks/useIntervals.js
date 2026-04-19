@@ -64,5 +64,17 @@ export function useIntervals() {
     [athleteId]
   );
 
-  return { fetchActivities, fetchStreams, fetchActivity };
+  const fetchRoutes = useCallback(
+    async () => {
+      const key = `routes_${athleteId}`;
+      const cached = cacheGet(key);
+      if (cached) return cached;
+      const data = await api.getRoutes(athleteId);
+      cacheSet(key, data);
+      return data;
+    },
+    [athleteId]
+  );
+
+  return { fetchActivities, fetchStreams, fetchActivity, fetchRoutes };
 }

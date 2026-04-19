@@ -32,6 +32,10 @@ export async function getActivities(athleteId, params = {}) {
   return request(`/athlete/${athleteId}/activities${qs ? `?${qs}` : ''}`);
 }
 
+export async function getRoutes(athleteId) {
+  return request(`/athlete/${athleteId}/routes`);
+}
+
 export async function getActivity(athleteId, activityId) {
   const raw = await request(`/athlete/${athleteId}/activities/${activityId}`);
   // API returns either a single object or a single-element array
@@ -49,9 +53,9 @@ export async function getActivityStreams(athleteId, activityId) {
     return null; // no GPS data for this activity
   }
 
-  const wanted = STREAMS.split(',').filter((s) => streamTypes.includes(s));
   // Correct endpoint: /api/v1/activity/{id}/streams — no athlete prefix, param is "types"
-  const url = `${BASE_URL}/activity/${activityId}/streams?types=${wanted.join(',')}`;
+  // Don't pre-filter by stream_types: computed streams like grade_smooth may not be listed there
+  const url = `${BASE_URL}/activity/${activityId}/streams?types=${STREAMS}`;
   const res = await fetch(url, { headers: getHeaders() });
   if (res.status === 404) return null;
   if (!res.ok) {

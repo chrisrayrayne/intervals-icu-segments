@@ -1,32 +1,25 @@
 import { useState, useCallback } from 'react';
-import { formatISO, subMonths } from 'date-fns';
 import { useIntervals } from './useIntervals';
-
-/**
- * Extracts unique routes (id + name) from a list of activities.
- */
-function extractRoutes(activities) {
-  const map = new Map();
-  for (const act of activities) {
-    if (act.route_id && act.route_name && !map.has(act.route_id)) {
-      map.set(act.route_id, { id: act.route_id, name: act.route_name });
-    }
-  }
-  return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-}
 
 export function useRoutes() {
   const [routes, setRoutes] = useState([]);
-  const { fetchActivities } = useIntervals();
+  const { fetchRoutes } = useIntervals();
 
   const loadRoutes = useCallback(async () => {
-    // Load the last 12 months to get a representative set of routes
-    const oldest = formatISO(subMonths(new Date(), 12), { representation: 'date' });
-    const newest = formatISO(new Date(), { representation: 'date' });
-    const activities = await fetchActivities({ oldest, newest });
-    setRoutes(extractRoutes(activities));
-    return activities;
-  }, [fetchActivities]);
+    try {
+      const data = await fetchRoutes();
+      // intervals.icu returns an array of route objects with id and name
+      const list = Array.isArray(data) ? data : [];
+      const mapped = list
+        .filter((r) => r.id && r.name)
+        .map((r) => ({ id: String(r.id), name: r.name }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      setRoutes(mapped);
+    } catch {
+      // Routes are optional; silently ignore errors
+      setRoutes([]);
+    }
+  }, [fetchRoutes]);
 
   return { routes, loadRoutes };
 }

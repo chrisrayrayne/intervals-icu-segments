@@ -65,11 +65,10 @@ export function useSegments() {
 
   const addEfforts = useCallback((newEfforts) => {
     setEfforts((prev) => {
-      const keys = new Set(prev.map((e) => `${e.segmentId}:${e.activityId}`));
-      const toAdd = newEfforts.filter(
-        (e) => !keys.has(`${e.segmentId}:${e.activityId}`)
-      );
-      const next = [...prev, ...toAdd];
+      // Replace any existing effort with the same segmentId+activityId
+      const newKeys = new Set(newEfforts.map((e) => `${e.segmentId}:${e.activityId}`));
+      const kept = prev.filter((e) => !newKeys.has(`${e.segmentId}:${e.activityId}`));
+      const next = [...kept, ...newEfforts];
       save(EFFORTS_KEY, next);
       return next;
     });

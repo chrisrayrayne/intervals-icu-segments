@@ -23,17 +23,22 @@ export function haversineDistance(lat1, lng1, lat2, lng2) {
 /**
  * Convert a raw latlng stream (flat [lat,lng,lat,lng,...] or [[lat,lng],...]) to [[lat,lng],...] pairs.
  */
+/**
+ * Normalise a raw latlng stream to an index-aligned array of [lat,lng]|null.
+ * Nulls are PRESERVED so that indices match other per-second streams (watts, hr, etc.).
+ * Callers that need display-only positions should filter nulls themselves.
+ */
 export function normaliseLatlng(raw) {
   if (!raw?.length) return [];
-  // After API zipping: array of [lat,lng] pairs or null for missing seconds
+  // Pre-zipped by API: array of [lat,lng]|null — return as-is to preserve indices
   const first = raw.find(v => v != null);
   if (Array.isArray(first)) {
-    return raw.filter((p) => p != null);
+    return raw;
   }
-  // Fallback: flat numeric array (should not happen with current API parsing)
+  // Fallback: flat numeric array — produce index-aligned array by interleaved pairing
   const pairs = [];
   for (let i = 0; i + 1 < raw.length; i += 2) {
-    if (raw[i] != null && raw[i + 1] != null) pairs.push([raw[i], raw[i + 1]]);
+    pairs.push(raw[i] != null && raw[i + 1] != null ? [raw[i], raw[i + 1]] : null);
   }
   return pairs;
 }
