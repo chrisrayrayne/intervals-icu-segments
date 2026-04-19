@@ -22,11 +22,12 @@ export default function App() {
     addSegment,
     removeSegment,
     addEfforts,
+    clearEffortsForSegment,
     getEffortsForSegment,
     importData,
   } = useSegments();
 
-  const { fetchStreams } = useIntervals();
+  const { fetchStreams, clearStreamCache } = useIntervals();
 
   // Restore auth from sessionStorage on mount
   useEffect(() => {
@@ -166,7 +167,14 @@ export default function App() {
             />
           )}
           {rightPanel === 'compare' && (
-            <CompareView segment={selectedSegment} efforts={segmentEfforts} />
+            <CompareView
+              segment={selectedSegment}
+              efforts={segmentEfforts}
+              onClearEfforts={() => {
+                clearStreamCache();
+                clearEffortsForSegment(selectedSegmentId);
+              }}
+            />
           )}
           {rightPanel === 'activities' && (
             <div className="flex items-center justify-center h-full text-muted text-sm">

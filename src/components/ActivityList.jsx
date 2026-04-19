@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { format, subYears, subMonths, formatISO } from 'date-fns';
+import { format, subMonths, formatISO } from 'date-fns';
 import { useIntervals } from '../hooks/useIntervals';
 import { useRoutes } from '../hooks/useRoutes';
 import RouteFilter from './RouteFilter';
@@ -9,25 +9,30 @@ import { extractEffortMetrics } from '../utils/metrics';
 const ACTIVITY_TYPES = ['', 'Ride', 'Run', 'Swim', 'Walk', 'Hike', 'VirtualRide'];
 
 // Default window: last 6 months. "Load more" extends by 6 months each time.
-function windowStart(yearsBack) {
-  return formatISO(subMonths(new Date(), 6 * yearsBack), { representation: 'date' });
+function windowStart(numWindows) {
+  return formatISO(subMonths(new Date(), 6 * numWindows), { representation: 'date' });
 }
 
 export default function ActivityList({ segments, onEffortsFound, onSelectActivity, selectedActivityId }) {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  // Pending = what's in the inputs; applied = what's active in the API query
-  const [pendingRouteFilter, setPendingRouteFilter] = useState('');
-  const [pendingTypeFilter, setPendingTypeFilter] = useState('');
+
+  // Pending filter inputs (not yet applied)
+  const [pendingRoute, setPendingRoute] = useState('');
+  const [pendingType, setPendingType] = useState('');
   const [pendingDateFrom, setPendingDateFrom] = useState('');
   const [pendingDateTo, setPendingDateTo] = useState('');
+  const [nameSearch, setNameSearch] = useState('');
+
+  // Applied filters (trigger API reload when changed)
   const [routeFilter, setRouteFilter] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [nameSearch, setNameSearch] = useState('');
-  // How many 6-month windows we've loaded (1 = last 6 months, 2 = last 12 months, …)
+
+  // Type filter is client-side only (API doesn't support it)
+  const [typeFilter, setTypeFilter] = useState('');
+
   const [windows, setWindows] = useState(1);
   const [analysing, setAnalysing] = useState(false);
 
@@ -44,7 +49,6 @@ export default function ActivityList({ segments, onEffortsFound, onSelectActivit
         newest: dateTo || today,
       };
       if (routeFilter) params.route_id = routeFilter;
-      if (typeFilter) params.type = typeFilter;
       const data = await fetchActivities(params);
       if (append) {
         setActivities((prev) => {
@@ -59,25 +63,25 @@ export default function ActivityList({ segments, onEffortsFound, onSelectActivit
     } finally {
       setLoading(false);
     }
-  }, [fetchActivities, routeFilter, typeFilter, dateFrom, dateTo]);
+  }, [fetchActivities, routeFilter, dateFrom, dateTo]);
 
-  // Initial load + route list
+  // Initial load + routes
   useEffect(() => {
     loadRoutes().catch(() => {});
     load(1, false);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Reload when applied filters change
+  // Reload when applied API filters change
   useEffect(() => {
     setWindows(1);
     load(1, false);
-  }, [routeFilter, typeFilter, dateFrom, dateTo]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [routeFilter, dateFrom, dateTo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function applyFilters() {
-    setRouteFilter(pendingRouteFilter);
-    setTypeFilter(pendingTypeFilter);
+    setRouteFilter(pendingRoute);
     setDateFrom(pendingDateFrom);
     setDateTo(pendingDateTo);
+    setTypeFilter(pendingType); // client-side, no reload needed
   }
 
   function loadMore() {
@@ -87,8 +91,9 @@ export default function ActivityList({ segments, onEffortsFound, onSelectActivit
   }
 
   const filtered = activities.filter((a) => {
-    if (!nameSearch) return true;
-    return a.name?.toLowerCase().includes(nameSearch.toLowerCase());
+    if (typeFilter && a.type !== typeFilter) return false;
+    if (nameSearch && !a.name?.toLowerCase().includes(nameSearch.toLowerCase())) return false;
+    return true;
   });
 
   async function analyseAll() {
@@ -125,42 +130,55 @@ export default function ActivityList({ segments, onEffortsFound, onSelectActivit
 
   return (
     <div className="flex flex-col h-full">
-      {/* Filter bar */}
-      <div className="flex flex-wrap gap-2 p-3 border-b border-border">
-        <RouteFilter routes={routes} value={routeFilter} onChange={setRouteFilter} />
+      {/* Filter bar — row 1: dropdowns + name search */}
+      <div className="flex flex-wrap gap-2 px-3 pt-3 pb-1">
+        <RouteFilter routes={routes} value={pendingRoute} onChange={setPendingRoute} />
         <select
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
-          className="bg-bg border border-border rounded-lg px-3 py-2 text-text text-sm focus:outline-none focus:border-accent"
+          value={pendingType}
+          onChange={(e) => setPendingType(e.target.value)}
+          className="bg-bg border border-border rounded-lg px-2 py-1.5 text-text text-sm focus:outline-none focus:border-accent"
         >
           {ACTIVITY_TYPES.map((t) => (
             <option key={t} value={t}>{t || 'All Types'}</option>
           ))}
         </select>
         <input
-          type="date"
-          value={dateFrom}
-          onChange={(e) => setDateFrom(e.target.value)}
-          className="bg-bg border border-border rounded-lg px-3 py-2 text-text text-sm focus:outline-none focus:border-accent"
-        />
-        <input
-          type="date"
-          value={dateTo}
-          onChange={(e) => setDateTo(e.target.value)}
-          className="bg-bg border border-border rounded-lg px-3 py-2 text-text text-sm focus:outline-none focus:border-accent"
-        />
-        <input
           type="text"
           value={nameSearch}
           onChange={(e) => setNameSearch(e.target.value)}
           placeholder="Search name…"
-          className="flex-1 min-w-32 bg-bg border border-border rounded-lg px-3 py-2 text-text text-sm placeholder-muted focus:outline-none focus:border-accent"
+          className="flex-1 min-w-0 bg-bg border border-border rounded-lg px-2 py-1.5 text-text text-sm placeholder-muted focus:outline-none focus:border-accent"
         />
+      </div>
+
+      {/* Filter bar — row 2: date range + Filter button */}
+      <div className="flex flex-wrap items-center gap-2 px-3 pb-3 border-b border-border">
+        <span className="text-muted text-xs whitespace-nowrap">From</span>
+        <input
+          type="date"
+          value={pendingDateFrom}
+          onChange={(e) => setPendingDateFrom(e.target.value)}
+          className="bg-bg border border-border rounded-lg px-2 py-1.5 text-text text-sm focus:outline-none focus:border-accent"
+        />
+        <span className="text-muted text-xs whitespace-nowrap">To</span>
+        <input
+          type="date"
+          value={pendingDateTo}
+          onChange={(e) => setPendingDateTo(e.target.value)}
+          className="bg-bg border border-border rounded-lg px-2 py-1.5 text-text text-sm focus:outline-none focus:border-accent"
+        />
+        <button
+          onClick={applyFilters}
+          disabled={loading}
+          className="bg-accent/10 hover:bg-accent/20 border border-accent/30 text-accent rounded-lg px-3 py-1.5 text-sm disabled:opacity-50 transition-colors whitespace-nowrap"
+        >
+          Filter
+        </button>
       </div>
 
       {/* Bulk analyse */}
       {segments.length > 0 && (
-        <div className="p-3 border-b border-border">
+        <div className="px-3 py-2 border-b border-border">
           <button
             onClick={analyseAll}
             disabled={analysing || loading}
@@ -171,7 +189,7 @@ export default function ActivityList({ segments, onEffortsFound, onSelectActivit
         </div>
       )}
 
-      {/* List */}
+      {/* Activity list */}
       <div className="flex-1 overflow-y-auto">
         {error && <p className="text-danger text-sm p-3">{error}</p>}
         {loading && !activities.length && (
@@ -185,7 +203,10 @@ export default function ActivityList({ segments, onEffortsFound, onSelectActivit
             onClick={() => onSelectActivity(activity)}
           />
         ))}
-        {filtered.length > 0 && (
+        {!loading && filtered.length === 0 && activities.length > 0 && (
+          <p className="text-muted text-sm p-3">No activities match the current filters.</p>
+        )}
+        {activities.length > 0 && (
           <div className="p-3">
             <button
               onClick={loadMore}
@@ -218,6 +239,9 @@ function ActivityRow({ activity, selected, onClick }) {
           <p className="text-text text-sm font-medium truncate">{activity.name}</p>
           <div className="flex items-center gap-2 mt-0.5">
             <span className="text-muted text-xs">{date}</span>
+            {activity.type && (
+              <span className="text-xs text-muted">{activity.type}</span>
+            )}
             {activity.route_name && (
               <span className="text-xs bg-accent/10 text-accent px-1.5 py-0.5 rounded">
                 {activity.route_name}
@@ -225,7 +249,6 @@ function ActivityRow({ activity, selected, onClick }) {
             )}
           </div>
         </div>
-        <div className="text-muted text-xs shrink-0">{activity.type}</div>
       </div>
     </div>
   );

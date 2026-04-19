@@ -33,7 +33,7 @@ const COLUMNS = [
 
 const COLORS = ['#00c87a', '#60a5fa', '#f59e0b', '#e879f9', '#fb923c', '#34d399'];
 
-export default function CompareView({ segment, efforts }) {
+export default function CompareView({ segment, efforts, onClearEfforts }) {
   const [sortKey, setSortKey] = useState('date');
   const [sortDir, setSortDir] = useState(1);
   const [view, setView] = useState('table'); // 'table' | 'timeline' | 'radar'
@@ -87,7 +87,15 @@ export default function CompareView({ segment, efforts }) {
           <h2 className="text-text font-semibold">{segment.name}</h2>
           {segment.description && <p className="text-muted text-xs">{segment.description}</p>}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          {onClearEfforts && efforts.length > 0 && (
+            <button
+              onClick={() => { if (window.confirm('Clear all efforts for this segment? You can re-analyse from the activity list.')) onClearEfforts(); }}
+              className="text-xs px-3 py-1.5 rounded-lg border border-danger/40 text-danger hover:bg-danger/10 transition-colors"
+            >
+              Clear efforts
+            </button>
+          )}
           {['table', 'timeline', 'radar'].map((v) => (
             <button
               key={v}

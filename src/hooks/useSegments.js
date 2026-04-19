@@ -74,6 +74,14 @@ export function useSegments() {
     });
   }, []);
 
+  const clearEffortsForSegment = useCallback((segmentId) => {
+    setEfforts((prev) => {
+      const next = prev.filter((e) => e.segmentId !== segmentId);
+      save(EFFORTS_KEY, next);
+      return next;
+    });
+  }, []);
+
   const getEffortsForSegment = useCallback(
     (segmentId) => efforts.filter((e) => e.segmentId === segmentId),
     [efforts]
@@ -99,6 +107,7 @@ export function useSegments() {
     removeSegment,
     addEffort,
     addEfforts,
+    clearEffortsForSegment,
     getEffortsForSegment,
     importData,
   };

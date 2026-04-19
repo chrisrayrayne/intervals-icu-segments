@@ -8,15 +8,22 @@ export function useRoutes() {
   const loadRoutes = useCallback(async () => {
     try {
       const data = await fetchRoutes();
-      // intervals.icu returns an array of route objects with id and name
+      console.log('[Routes] raw API response:', data);
       const list = Array.isArray(data) ? data : [];
       const mapped = list
-        .filter((r) => r.id && r.name)
-        .map((r) => ({ id: String(r.id), name: r.name }))
+        .map((r) => {
+          // intervals.icu may use id or route_id; name is usually 'name'
+          const id = r.id ?? r.route_id;
+          const name = r.name ?? r.route_name;
+          if (!id || !name) return null;
+          return { id: String(id), name };
+        })
+        .filter(Boolean)
         .sort((a, b) => a.name.localeCompare(b.name));
+      console.log('[Routes] mapped:', mapped);
       setRoutes(mapped);
-    } catch {
-      // Routes are optional; silently ignore errors
+    } catch (e) {
+      console.warn('[Routes] fetch failed:', e.message);
       setRoutes([]);
     }
   }, [fetchRoutes]);

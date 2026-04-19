@@ -43,8 +43,8 @@ export function useIntervals() {
     async (activityId) => {
       const key = `streams_${activityId}`;
       const cached = cacheGet(key);
-      // Only use cache if it has real latlng data with actual points
-      if (cached !== null && cached?.latlng?.length > 0) return cached;
+      // Only use cache if it has real latlng data AND a time stream (time was added later; stale cache won't have it)
+      if (cached !== null && cached?.latlng?.length > 0 && cached?.time?.length > 0) return cached;
       const data = await api.getActivityStreams(athleteId, activityId);
       if (data?.latlng?.length > 0) cacheSet(key, data); // only cache usable results
       return data;
@@ -76,5 +76,15 @@ export function useIntervals() {
     [athleteId]
   );
 
-  return { fetchActivities, fetchStreams, fetchActivity, fetchRoutes };
+  const clearStreamCache = useCallback(() => {
+    // Remove all stream entries from both the in-memory cache and sessionStorage
+    for (const key of [...cache.keys()]) {
+      if (key.startsWith('streams_')) cache.delete(key);
+    }
+    for (const key of Object.keys(sessionStorage)) {
+      if (key.startsWith('streams_')) sessionStorage.removeItem(key);
+    }
+  }, []);
+
+  return { fetchActivities, fetchStreams, fetchActivity, fetchRoutes, clearStreamCache };
 }

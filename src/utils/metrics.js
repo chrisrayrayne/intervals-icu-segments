@@ -90,7 +90,9 @@ function normalizedPower(wattsArr, start, end) {
  * Extract effort metrics from streams for a given index range.
  */
 export function extractEffortMetrics(streams, startIndex, endIndex) {
-  const timeArr = streams.time;
+  // Synthesize time if the API omitted it (streams are 1 sample/sec starting at 0)
+  const streamLen = (streams.distance ?? streams.watts ?? streams.heartrate ?? streams.velocity_smooth ?? []).length;
+  const timeArr = streams.time?.length ? streams.time : (streamLen ? Array.from({ length: streamLen }, (_, i) => i) : null);
   const distArr = streams.distance;
   const altArr = streams.altitude;
   const velArr = streams.velocity_smooth;
@@ -120,7 +122,7 @@ export function extractEffortMetrics(streams, startIndex, endIndex) {
 
   // Per-point stream slices for segment chart overlay
   const streamSlices = {};
-  const SLICE_KEYS = ['watts', 'heartrate', 'velocity_smooth', 'cadence', 'altitude', 'grade_smooth', 'distance'];
+  const SLICE_KEYS = ['time', 'watts', 'heartrate', 'velocity_smooth', 'cadence', 'altitude', 'grade_smooth', 'distance'];
   for (const key of SLICE_KEYS) {
     if (streams[key]) streamSlices[key] = streams[key].slice(startIndex, endIndex + 1);
   }
