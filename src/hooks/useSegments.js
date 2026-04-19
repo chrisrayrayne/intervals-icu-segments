@@ -37,6 +37,14 @@ export function useSegments() {
     return segment;
   }, []);
 
+  const updateSegment = useCallback((id, updates) => {
+    setSegments((prev) => {
+      const next = prev.map((s) => s.id === id ? { ...s, ...updates } : s);
+      save(SEGMENTS_KEY, next);
+      return next;
+    });
+  }, []);
+
   const removeSegment = useCallback((id) => {
     setSegments((prev) => {
       const next = prev.filter((s) => s.id !== id);
@@ -104,6 +112,7 @@ export function useSegments() {
     segments,
     efforts,
     addSegment,
+    updateSegment,
     removeSegment,
     addEffort,
     addEfforts,

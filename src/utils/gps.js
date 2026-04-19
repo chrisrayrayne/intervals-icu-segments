@@ -1,5 +1,22 @@
 const R = 6371000; // Earth radius in metres
 
+/**
+ * Check every point in latlngSlice is within toleranceMeters of at least one
+ * point in referenceLatlng. Returns false as soon as a deviant point is found.
+ */
+export function isOnRoute(latlngSlice, referenceLatlng, toleranceMeters) {
+  if (!referenceLatlng?.length) return true; // no reference — accept all
+  for (const pt of latlngSlice) {
+    if (!pt) continue;
+    const [lat, lng] = pt;
+    const onRoute = referenceLatlng.some(
+      (ref) => haversineDistance(lat, lng, ref[0], ref[1]) <= toleranceMeters
+    );
+    if (!onRoute) return false;
+  }
+  return true;
+}
+
 function toRad(deg) {
   return (deg * Math.PI) / 180;
 }
@@ -67,25 +84,72 @@ export function findClosestPoint(latlng, stream, toleranceMeters = 25) {
 
 /**
  * Extract start/end indices for a segment within a latlng stream.
- * Returns null if either endpoint is not found.
+ *
+ * Strategy: scan for every "entry" into the start zone (the moment the track
+ * crosses within toleranceMeters of the start point).  For each entry, scan
+ * forward for the first "entry" into the end zone.  Among all valid pairs
+ * return the one with the shortest duration (fastest effort).
+ *
+ * This handles out-and-back routes, multiple laps, and activities that pass
+ * near the start point earlier in the ride without actually doing the segment.
  */
 export function matchSegment(segment, latlngStream) {
-  const startIdx = findClosestPoint(segment.start, latlngStream, segment.toleranceMeters);
-  if (startIdx === null) return null;
+  const tol = segment.toleranceMeters;
+  const n   = latlngStream.length;
 
-  // Search for end only after start
-  let bestIdx = null;
-  let bestDist = Infinity;
-  for (let i = startIdx + 1; i < latlngStream.length; i++) {
+  // ── 1. Find every entry into the start zone ───────────────────────────────
+  //    An "entry" is the first index of a consecutive run within tolerance.
+  //    We also track the best (closest) index within that run.
+  const startZones = []; // [{bestIdx, exitAt}]
+  let inStart = false;
+  let bestStartDist = Infinity;
+  let bestStartIdx  = -1;
+
+  for (let i = 0; i < n; i++) {
     const pt = toLatLng(latlngStream[i]);
     if (!pt) continue;
-    const [lat, lng] = pt;
-    const d = haversineDistance(segment.end.lat, segment.end.lng, lat, lng);
-    if (d < bestDist && d <= segment.toleranceMeters) {
-      bestDist = d;
-      bestIdx = i;
+    const d = haversineDistance(segment.start.lat, segment.start.lng, pt[0], pt[1]);
+    if (d <= tol) {
+      if (!inStart) { inStart = true; bestStartDist = Infinity; } // entering
+      if (d < bestStartDist) { bestStartDist = d; bestStartIdx = i; }
+    } else if (inStart) {
+      // Exiting start zone — record it
+      startZones.push({ bestIdx: bestStartIdx, exitAt: i });
+      inStart = false;
     }
   }
-  if (bestIdx === null) return null;
-  return { startIndex: startIdx, endIndex: bestIdx };
+  if (inStart) startZones.push({ bestIdx: bestStartIdx, exitAt: n });
+
+  if (!startZones.length) return null;
+
+  // ── 2. For each start zone exit, scan forward for the first end zone ──────
+  const matches = [];
+
+  for (const { bestIdx: startIdx, exitAt } of startZones) {
+    let inEnd = false;
+    let bestEndDist = Infinity;
+    let bestEndIdx  = -1;
+
+    for (let j = exitAt; j < n; j++) {
+      const pt = toLatLng(latlngStream[j]);
+      if (!pt) continue;
+      const d = haversineDistance(segment.end.lat, segment.end.lng, pt[0], pt[1]);
+      if (d <= tol) {
+        inEnd = true;
+        if (d < bestEndDist) { bestEndDist = d; bestEndIdx = j; }
+      } else if (inEnd) {
+        // Exited the first end zone — stop here
+        break;
+      }
+    }
+
+    if (bestEndIdx >= 0) {
+      matches.push({ startIndex: startIdx, endIndex: bestEndIdx, duration: bestEndIdx - startIdx });
+    }
+  }
+
+  if (!matches.length) return null;
+
+  // Return the fastest (shortest duration) match
+  return matches.reduce((best, m) => m.duration < best.duration ? m : best);
 }

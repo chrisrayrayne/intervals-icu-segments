@@ -20,6 +20,7 @@ export default function App() {
     segments,
     efforts,
     addSegment,
+    updateSegment,
     removeSegment,
     addEfforts,
     clearEffortsForSegment,
@@ -75,6 +76,12 @@ export default function App() {
       if (latlng) {
         const match = matchSegment(segment, latlng);
         if (match) {
+          // Store the reference GPS route from the creating activity
+          const refLatlng = normaliseLatlng(streams.latlng)
+            .slice(match.startIndex, match.endIndex + 1)
+            .filter(Boolean);
+          updateSegment(segment.id, { referenceLatlng: refLatlng });
+
           const metrics = extractEffortMetrics(streams, match.startIndex, match.endIndex);
           addEfforts([{
             segmentId: segment.id,

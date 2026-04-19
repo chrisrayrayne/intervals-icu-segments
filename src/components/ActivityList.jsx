@@ -3,7 +3,7 @@ import { format, subMonths, formatISO } from 'date-fns';
 import { useIntervals } from '../hooks/useIntervals';
 import { useRoutes } from '../hooks/useRoutes';
 import RouteFilter from './RouteFilter';
-import { matchSegment, normaliseLatlng } from '../utils/gps';
+import { matchSegment, normaliseLatlng, isOnRoute } from '../utils/gps';
 import { extractEffortMetrics } from '../utils/metrics';
 
 const ACTIVITY_TYPES = ['', 'Ride', 'Run', 'Swim', 'Walk', 'Hike', 'VirtualRide'];
@@ -108,6 +108,14 @@ export default function ActivityList({ segments, onEffortsFound, onSelectActivit
         for (const seg of segments) {
           const match = matchSegment(seg, latlngStream);
           if (!match) continue;
+
+          // Reject efforts that deviate from the reference route
+          if (seg.referenceLatlng?.length) {
+            const slice = latlngStream.slice(match.startIndex, match.endIndex + 1);
+            const routeTolerance = Math.max(seg.toleranceMeters, 25);
+            if (!isOnRoute(slice, seg.referenceLatlng, routeTolerance)) continue;
+          }
+
           const metrics = extractEffortMetrics(streams, match.startIndex, match.endIndex);
           newEfforts.push({
             segmentId: seg.id,
