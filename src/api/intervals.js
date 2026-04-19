@@ -33,13 +33,46 @@ export async function getActivities(athleteId, params = {}) {
 }
 
 export async function getActivity(athleteId, activityId) {
-  return request(`/athlete/${athleteId}/activity/${activityId}`);
+  const raw = await request(`/athlete/${athleteId}/activities/${activityId}`);
+  // API returns either a single object or a single-element array
+  return Array.isArray(raw) ? raw[0] : raw;
 }
 
 const STREAMS = 'time,latlng,distance,altitude,velocity_smooth,heartrate,cadence,watts,grade_smooth';
 
 export async function getActivityStreams(athleteId, activityId) {
-  return request(
-    `/athlete/${athleteId}/activity/${activityId}/streams?streams=${STREAMS}`
-  );
+  // Check activity detail first: if no latlng in stream_types, skip the fetch
+  const detail = await getActivity(athleteId, activityId);
+  const streamTypes = detail?.stream_types ?? [];
+
+  if (!streamTypes.includes('latlng')) {
+    return null; // no GPS data for this activity
+  }
+
+  const wanted = STREAMS.split(',').filter((s) => streamTypes.includes(s));
+  // Correct endpoint: /api/v1/activity/{id}/streams — no athlete prefix, param is "types"
+  const url = `${BASE_URL}/activity/${activityId}/streams?types=${wanted.join(',')}`;
+  const res = await fetch(url, { headers: getHeaders() });
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`API ${res.status}: ${text || res.statusText}`);
+  }
+  const data = await res.json();
+  // Response is [{type, data, data2?}, ...] — convert to {latlng: [...], time: [...], ...}
+  // latlng stream has data (lat, ~47 for Switzerland) + data2 (lng, ~8 for Switzerland)
+  if (Array.isArray(data)) {
+    return Object.fromEntries(data.map((s) => {
+      if (s.type === 'latlng' && Array.isArray(s.data2)) {
+        // Zip lat (data) + lng (data2) → [[lat,lng], null, ...]
+        const zipped = s.data.map((lat, i) => {
+          const lng = s.data2[i];
+          return (lat != null && lng != null) ? [lat, lng] : null;
+        });
+        return [s.type, zipped];
+      }
+      return [s.type, s.data];
+    }));
+  }
+  return data;
 }

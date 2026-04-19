@@ -1,12 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
-import { format } from 'date-fns';
+import { format, subYears, subMonths, formatISO } from 'date-fns';
 import { useIntervals } from '../hooks/useIntervals';
 import { useRoutes } from '../hooks/useRoutes';
 import RouteFilter from './RouteFilter';
-import { matchSegment } from '../utils/gps';
+import { matchSegment, normaliseLatlng } from '../utils/gps';
 import { extractEffortMetrics } from '../utils/metrics';
 
 const ACTIVITY_TYPES = ['', 'Ride', 'Run', 'Swim', 'Walk', 'Hike', 'VirtualRide'];
+
+// Default window: last 6 months. "Load more" extends by 6 months each time.
+function windowStart(yearsBack) {
+  return formatISO(subMonths(new Date(), 6 * yearsBack), { representation: 'date' });
+}
 
 export default function ActivityList({ segments, onEffortsFound, onSelectActivity, selectedActivityId }) {
   const [activities, setActivities] = useState([]);
@@ -17,24 +22,33 @@ export default function ActivityList({ segments, onEffortsFound, onSelectActivit
   const [nameSearch, setNameSearch] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [page, setPage] = useState(0);
+  // How many 6-month windows we've loaded (1 = last 6 months, 2 = last 12 months, …)
+  const [windows, setWindows] = useState(1);
   const [analysing, setAnalysing] = useState(false);
 
   const { fetchActivities, fetchStreams } = useIntervals();
   const { routes, loadRoutes } = useRoutes();
 
-  const load = useCallback(async (offset = 0) => {
+  const load = useCallback(async (numWindows = 1, append = false) => {
     setLoading(true);
     setError('');
     try {
-      const params = { limit: 50, offset };
+      const today = formatISO(new Date(), { representation: 'date' });
+      const params = {
+        oldest: dateFrom || windowStart(numWindows),
+        newest: dateTo || today,
+      };
       if (routeFilter) params.route_id = routeFilter;
       if (typeFilter) params.type = typeFilter;
-      if (dateFrom) params.oldest = dateFrom;
-      if (dateTo) params.newest = dateTo;
       const data = await fetchActivities(params);
-      if (offset === 0) setActivities(data);
-      else setActivities((prev) => [...prev, ...data]);
+      if (append) {
+        setActivities((prev) => {
+          const ids = new Set(prev.map((a) => a.id));
+          return [...prev, ...data.filter((a) => !ids.has(a.id))];
+        });
+      } else {
+        setActivities(data);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -42,22 +56,22 @@ export default function ActivityList({ segments, onEffortsFound, onSelectActivit
     }
   }, [fetchActivities, routeFilter, typeFilter, dateFrom, dateTo]);
 
-  // Initial load: also load routes
+  // Initial load + route list
   useEffect(() => {
     loadRoutes().catch(() => {});
-    load(0);
+    load(1, false);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reload when filters change
   useEffect(() => {
-    setPage(0);
-    load(0);
+    setWindows(1);
+    load(1, false);
   }, [routeFilter, typeFilter, dateFrom, dateTo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function loadMore() {
-    const nextPage = page + 1;
-    setPage(nextPage);
-    load(nextPage * 50);
+    const next = windows + 1;
+    setWindows(next);
+    load(next, true);
   }
 
   const filtered = activities.filter((a) => {
@@ -72,8 +86,8 @@ export default function ActivityList({ segments, onEffortsFound, onSelectActivit
     for (const activity of filtered.slice(0, 50)) {
       try {
         const streams = await fetchStreams(activity.id);
-        const latlngStream = streams.latlng;
-        if (!latlngStream) continue;
+        const latlngStream = normaliseLatlng(streams?.latlng);
+        if (!latlngStream.length) continue;
         for (const seg of segments) {
           const match = matchSegment(seg, latlngStream);
           if (!match) continue;
@@ -116,14 +130,12 @@ export default function ActivityList({ segments, onEffortsFound, onSelectActivit
           value={dateFrom}
           onChange={(e) => setDateFrom(e.target.value)}
           className="bg-bg border border-border rounded-lg px-3 py-2 text-text text-sm focus:outline-none focus:border-accent"
-          placeholder="From"
         />
         <input
           type="date"
           value={dateTo}
           onChange={(e) => setDateTo(e.target.value)}
           className="bg-bg border border-border rounded-lg px-3 py-2 text-text text-sm focus:outline-none focus:border-accent"
-          placeholder="To"
         />
         <input
           type="text"
@@ -157,7 +169,6 @@ export default function ActivityList({ segments, onEffortsFound, onSelectActivit
           <ActivityRow
             key={activity.id}
             activity={activity}
-            segments={segments}
             selected={selectedActivityId === activity.id}
             onClick={() => onSelectActivity(activity)}
           />
@@ -169,7 +180,7 @@ export default function ActivityList({ segments, onEffortsFound, onSelectActivit
               disabled={loading}
               className="text-sm text-muted hover:text-text disabled:opacity-50"
             >
-              {loading ? 'Loading…' : 'Load more'}
+              {loading ? 'Loading…' : `Load more (back to ${windowStart(windows + 1)})`}
             </button>
           </div>
         )}
@@ -178,7 +189,7 @@ export default function ActivityList({ segments, onEffortsFound, onSelectActivit
   );
 }
 
-function ActivityRow({ activity, segments, selected, onClick }) {
+function ActivityRow({ activity, selected, onClick }) {
   const date = activity.start_date_local
     ? format(new Date(activity.start_date_local), 'dd.MM.yyyy')
     : '';

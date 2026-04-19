@@ -43,9 +43,10 @@ export function useIntervals() {
     async (activityId) => {
       const key = `streams_${activityId}`;
       const cached = cacheGet(key);
-      if (cached) return cached;
+      // Only use cache if it has real latlng data with actual points
+      if (cached !== null && cached?.latlng?.length > 0) return cached;
       const data = await api.getActivityStreams(athleteId, activityId);
-      cacheSet(key, data);
+      if (data?.latlng?.length > 0) cacheSet(key, data); // only cache usable results
       return data;
     },
     [athleteId]

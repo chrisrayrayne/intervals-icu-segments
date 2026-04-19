@@ -6,7 +6,7 @@ import MapPicker from './components/MapPicker';
 import CompareView from './components/CompareView';
 import { useSegments } from './hooks/useSegments';
 import { useIntervals } from './hooks/useIntervals';
-import { matchSegment } from './utils/gps';
+import { matchSegment, normaliseLatlng } from './utils/gps';
 import { extractEffortMetrics } from './utils/metrics';
 
 export default function App() {
@@ -70,7 +70,7 @@ export default function App() {
     // Immediately try to match the creating activity
     try {
       const streams = await fetchStreams(selectedActivity.id);
-      const latlng = streams.latlng;
+      const latlng = normaliseLatlng(streams?.latlng);
       if (latlng) {
         const match = matchSegment(segment, latlng);
         if (match) {

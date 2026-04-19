@@ -18,8 +18,8 @@ body {
   background: #13131a;
 }
 
-.leaflet-tile {
-  filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.9);
+.leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9);
 }
 
 /* Scrollbar */

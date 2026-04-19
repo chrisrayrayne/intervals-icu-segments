@@ -20,11 +20,37 @@ export function haversineDistance(lat1, lng1, lat2, lng2) {
  * @param {number} toleranceMeters
  * @returns {number | null}  stream index or null if not found
  */
+/**
+ * Convert a raw latlng stream (flat [lat,lng,lat,lng,...] or [[lat,lng],...]) to [[lat,lng],...] pairs.
+ */
+export function normaliseLatlng(raw) {
+  if (!raw?.length) return [];
+  // After API zipping: array of [lat,lng] pairs or null for missing seconds
+  const first = raw.find(v => v != null);
+  if (Array.isArray(first)) {
+    return raw.filter((p) => p != null);
+  }
+  // Fallback: flat numeric array (should not happen with current API parsing)
+  const pairs = [];
+  for (let i = 0; i + 1 < raw.length; i += 2) {
+    if (raw[i] != null && raw[i + 1] != null) pairs.push([raw[i], raw[i + 1]]);
+  }
+  return pairs;
+}
+
+function toLatLng(p) {
+  if (p == null) return null;
+  if (Array.isArray(p)) return p[0] != null ? [p[0], p[1]] : null;
+  return null;
+}
+
 export function findClosestPoint(latlng, stream, toleranceMeters = 25) {
   let bestIdx = null;
   let bestDist = Infinity;
   for (let i = 0; i < stream.length; i++) {
-    const [lat, lng] = stream[i];
+    const pt = toLatLng(stream[i]);
+    if (!pt) continue;
+    const [lat, lng] = pt;
     const d = haversineDistance(latlng.lat, latlng.lng, lat, lng);
     if (d < bestDist && d <= toleranceMeters) {
       bestDist = d;
@@ -46,7 +72,9 @@ export function matchSegment(segment, latlngStream) {
   let bestIdx = null;
   let bestDist = Infinity;
   for (let i = startIdx + 1; i < latlngStream.length; i++) {
-    const [lat, lng] = latlngStream[i];
+    const pt = toLatLng(latlngStream[i]);
+    if (!pt) continue;
+    const [lat, lng] = pt;
     const d = haversineDistance(segment.end.lat, segment.end.lng, lat, lng);
     if (d < bestDist && d <= segment.toleranceMeters) {
       bestDist = d;

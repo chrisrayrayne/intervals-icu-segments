@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Polyline, Marker, useMapEvents } from 'react-leaflet';
+import { useState, useEffect } from 'react';
+import { MapContainer, TileLayer, Polyline, Marker, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { useIntervals } from '../hooks/useIntervals';
-import { findClosestPoint } from '../utils/gps';
+import { findClosestPoint, normaliseLatlng } from '../utils/gps';
 
 // Fix Leaflet default icon paths (Vite asset handling)
 delete L.Icon.Default.prototype._getIconUrl;
@@ -31,6 +31,18 @@ function ClickHandler({ onMapClick }) {
   return null;
 }
 
+function FitBounds({ positions }) {
+  const map = useMap();
+  useEffect(() => {
+    if (positions?.length) {
+      map.fitBounds(positions, { padding: [20, 20] });
+    } else {
+      map.invalidateSize();
+    }
+  }, [map, positions]);
+  return null;
+}
+
 export default function MapPicker({ activity, onSegmentCreated, onCancel }) {
   const [latlngStream, setLatlngStream] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -42,15 +54,23 @@ export default function MapPicker({ activity, onSegmentCreated, onCancel }) {
   const [description, setDescription] = useState('');
   const [tolerance, setTolerance] = useState(25);
   const { fetchStreams } = useIntervals();
-  const mapRef = useRef(null);
 
   useEffect(() => {
     if (!activity) return;
     setLoading(true);
     fetchStreams(activity.id)
       .then((streams) => {
-        setLatlngStream(streams.latlng || null);
-        if (!streams.latlng) setError('No GPS data for this activity');
+        if (!streams || !streams.latlng?.length) {
+          setError('No GPS data for this activity');
+        } else {
+          const pairs = normaliseLatlng(streams.latlng);
+          console.log('[MapPicker] latlng pairs:', pairs.length, 'sample:', JSON.stringify(pairs[0]));
+          if (pairs.length === 0) {
+            setError('No GPS data for this activity');
+          } else {
+            setLatlngStream(pairs);
+          }
+        }
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -98,7 +118,7 @@ export default function MapPicker({ activity, onSegmentCreated, onCancel }) {
     );
   }
 
-  if (error || !latlngStream) {
+  if (error || !latlngStream || latlngStream.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3">
         <p className="text-danger text-sm">{error || 'No GPS data'}</p>
@@ -111,7 +131,7 @@ export default function MapPicker({ activity, onSegmentCreated, onCancel }) {
   const positions = latlngStream;
 
   return (
-    <div className="flex flex-col h-full gap-3 p-3">
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: 12, gap: 8 }}>
       <div className="flex items-center justify-between">
         <h3 className="text-text font-semibold">Define Segment</h3>
         <button onClick={onCancel} className="text-muted hover:text-text text-sm">Cancel</button>
@@ -123,16 +143,16 @@ export default function MapPicker({ activity, onSegmentCreated, onCancel }) {
         {step === 'name' && 'Name your segment'}
       </div>
 
-      <div className="rounded-lg overflow-hidden border border-border" style={{ height: 320 }}>
+      <div style={{ flex: 1, minHeight: 200, border: '1px solid #1e1e2e', borderRadius: 8 }}>
         <MapContainer
           center={center}
-          zoom={14}
+          zoom={13}
           style={{ height: '100%', width: '100%' }}
-          ref={mapRef}
         >
+          <FitBounds positions={positions} />
           <TileLayer
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution='&copy; <a href="https://openstreetmap.org">OpenStreetMap</a>'
+            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+            attribution='&copy; <a href="https://carto.com/">CARTO</a>'
           />
           <Polyline positions={positions} color="#00c87a" weight={3} opacity={0.8} />
           {startPoint && <Marker position={[startPoint.lat, startPoint.lng]} icon={startIcon} />}

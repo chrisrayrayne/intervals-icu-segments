@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { formatISO, subMonths } from 'date-fns';
 import { useIntervals } from './useIntervals';
 
 /**
@@ -19,8 +20,10 @@ export function useRoutes() {
   const { fetchActivities } = useIntervals();
 
   const loadRoutes = useCallback(async () => {
-    // Load a larger batch to get a representative set of routes
-    const activities = await fetchActivities({ limit: 200 });
+    // Load the last 12 months to get a representative set of routes
+    const oldest = formatISO(subMonths(new Date(), 12), { representation: 'date' });
+    const newest = formatISO(new Date(), { representation: 'date' });
+    const activities = await fetchActivities({ oldest, newest });
     setRoutes(extractRoutes(activities));
     return activities;
   }, [fetchActivities]);
