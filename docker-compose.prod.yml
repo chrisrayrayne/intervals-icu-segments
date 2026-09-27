@@ -1,0 +1,6 @@
+services:
+  app:
+    image: ghcr.io/chrisrayrayne/intervals-icu-segments:latest
+    ports:
+      - "3003:80"
+    restart: unless-stopped
